@@ -37,7 +37,7 @@ class HomeScreen extends StatelessWidget {
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushNamed(context, '/training');
+                Navigator.pushNamed(context, '/levels-list');
               },
               child: const Text('Тренировка'),
             ),
