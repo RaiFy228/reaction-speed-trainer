@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reaction_speed_trainer/providers/levels_provider.dart';
+import 'package:reaction_speed_trainer/screens/home_history_screen.dart';
+import 'package:reaction_speed_trainer/screens/tabbed_home_screen.dart';
 import 'providers/reaction_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/measure_reaction_screen.dart';
 import 'screens/level_list_screen.dart';
-import 'screens/history_screen.dart';
+import 'screens/level_history_screen.dart';
 
-void main() {
+void main() async{
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final reactionProvider = ReactionProvider();
+  await reactionProvider.loadResults();
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ReactionProvider()),
+        ChangeNotifierProvider(create: (_) => reactionProvider),
         ChangeNotifierProvider(create: (_) => LevelsProvider())
       ],
       child: const MyApp(),
@@ -31,11 +37,10 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => const HomeScreen(),
+        '/': (context) => const TabbedHomeScreen(),
         '/measure-reaction': (context) => const MeasureReactionScreen(),
-        '/levels-list': (context) => const LevelsListScreen(),
-
         '/history': (context) => const HistoryScreen(),
+        '/level-history': (context) => const LevelHistoryScreen(),
       },
     );
   }

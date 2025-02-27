@@ -11,9 +11,6 @@ class LevelsListScreen extends StatelessWidget {
     final levelsProvider = Provider.of<LevelsProvider>(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Тренировка'),
-      ),
       body: ListView.builder(
         itemCount: levelsProvider.levels.length,
         itemBuilder: (context, index) {
