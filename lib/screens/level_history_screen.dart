@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/levels_provider.dart';
 import '../models/level.dart';
 
-class HistoryScreen extends StatelessWidget {
-  const HistoryScreen({super.key});
+class LevelHistoryScreen extends StatelessWidget {
+  const LevelHistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

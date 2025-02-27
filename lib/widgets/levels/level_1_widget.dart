@@ -1,5 +1,4 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 
 class Level1Widget extends StatefulWidget {
@@ -12,12 +11,16 @@ class Level1Widget extends StatefulWidget {
 class _Level1WidgetState extends State<Level1Widget> {
   bool _isWaiting = true;
   late DateTime _startTime;
+  bool _isDisposed = false; // Флаг для проверки состояния виджета
 
   void _startTest() {
     setState(() {
       _isWaiting = true;
     });
+
     Future.delayed(Duration(seconds: Random().nextInt(5) + 2), () {
+      if (_isDisposed) return; // Проверяем, не уничтожен ли виджет
+
       setState(() {
         _isWaiting = false;
         _startTime = DateTime.now();
@@ -51,6 +54,12 @@ class _Level1WidgetState extends State<Level1Widget> {
   void initState() {
     super.initState();
     _startTest();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true; // Устанавливаем флаг, чтобы остановить асинхронный процесс
+    super.dispose();
   }
 
   @override
