@@ -50,7 +50,6 @@ class ReactionProvider with ChangeNotifier {
                 })
             .toList();
       } catch (e) {
-        print('Ошибка загрузки истории: $e');
         _results = [];
       }
     } else {

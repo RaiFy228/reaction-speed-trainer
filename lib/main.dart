@@ -4,9 +4,7 @@ import 'package:reaction_speed_trainer/providers/levels_provider.dart';
 import 'package:reaction_speed_trainer/screens/home_history_screen.dart';
 import 'package:reaction_speed_trainer/screens/tabbed_home_screen.dart';
 import 'providers/reaction_provider.dart';
-import 'screens/home_screen.dart';
 import 'screens/measure_reaction_screen.dart';
-import 'screens/level_list_screen.dart';
 import 'screens/level_history_screen.dart';
 
 void main() async{

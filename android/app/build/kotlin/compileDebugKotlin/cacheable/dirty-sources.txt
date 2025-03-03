@@ -1,0 +1,1 @@
+D:\diploma_work\reaction_speed_trainer\android\app\src\main\kotlin\com\example\reaction_speed_trainer\MainActivity.kt
