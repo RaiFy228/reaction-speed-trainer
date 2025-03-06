@@ -61,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } else if (!_isWaitingForGreen && !_isShowingResult) {
       // Нажатие на зеленый блок
       final reactionTime = DateTime.now().difference(_startTime!).inMilliseconds.toDouble();
-      Provider.of<ReactionProvider>(context, listen: false).addResult(reactionTime);
+      Provider.of<ReactionProvider>(context, listen: false).addResult(type: 'measurements', time: reactionTime);
       setState(() {
         _reactionTime = reactionTime;
         _isShowingResult = true; // Показываем результат
@@ -86,29 +86,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: _onTap,
-              child: Container(
-                width: 300,
-                height: 350,
-                color: _getColor(),
-                child: Center(
-                  child: _getText(),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: _onTap,
+                child: Container(
+                  width: 300,
+                  height: 350,
+                  color: _getColor(),
+                  child: Center(
+                    child: _getText(),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/history');
-              },
-              child: const Text('История результатов'),
-            ),
-            const SizedBox(height: 30),
-          ],
+              const SizedBox(height: 30),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/history');
+                },
+                child: const Text('История результатов'),
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
         ),
       ),
     );

@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "352760787087",
+    "firebase_url": "https://reactionspeedtrainer-default-rtdb.europe-west1.firebasedatabase.app",
     "project_id": "reactionspeedtrainer",
     "storage_bucket": "reactionspeedtrainer.firebasestorage.app"
   },
