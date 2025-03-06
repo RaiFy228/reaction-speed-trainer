@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:reaction_speed_trainer/screens/home_screen.dart';
-import 'package:reaction_speed_trainer/screens/level_list_screen.dart';
+import 'package:reaction_speed_trainer/widgets/home_screen_widget.dart';
+import 'package:reaction_speed_trainer/widgets/level_list_screen_widget.dart';
 
 class TabbedHomeScreen extends StatefulWidget {
   const TabbedHomeScreen({super.key});
@@ -29,6 +29,7 @@ class _TabbedHomeScreenState extends State<TabbedHomeScreen> with SingleTickerPr
     return Scaffold(
       appBar: AppBar(
         title: const Text('Тренинг Реакции'),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -47,6 +48,7 @@ class _TabbedHomeScreenState extends State<TabbedHomeScreen> with SingleTickerPr
       ),
       body: TabBarView(
         controller: _tabController,
+        physics: const NeverScrollableScrollPhysics(),
         children: const [
           HomeScreen(), // Главный экран
           LevelsListScreen(), // Экран с уровнями

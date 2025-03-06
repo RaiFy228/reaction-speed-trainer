@@ -41,26 +41,7 @@ class HistoryScreen extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.delete_forever),
                   onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Очистить историю?'),
-                        content: const Text('Вы уверены, что хотите удалить все результаты?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Отмена'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              reactionProvider.clearResults();
-                              Navigator.pop(context);
-                            },
-                            child: const Text('Удалить'),
-                          ),
-                        ],
-                      ),
-                    );
+                    _showClearHistoryDialog(context, reactionProvider);
                   },
                 ),
               ],
@@ -69,41 +50,85 @@ class HistoryScreen extends StatelessWidget {
         ),
       ),
       body: reactionProvider.results.isEmpty
-    ? const Center(child: Text('Нет сохраненных результатов'))
-    : Column(
-        children: [
-          
-          Expanded(
-            child: ListView.builder(
-              itemCount: reactionProvider.results.length,
-              itemBuilder: (context, index) {
-                final result = reactionProvider.results[index];
-                return Dismissible(
-                  key: Key(result['date']),
-                  direction: DismissDirection.endToStart,
-                  background: Container(
-                    color: Colors.red,
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 20),
-                    child: const Icon(Icons.delete, color: Colors.white),
+          ? const Center(child: Text('Нет сохраненных результатов'))
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: reactionProvider.results.length,
+                    itemBuilder: (context, index) {
+                      final result = reactionProvider.results[index];
+                      return Dismissible(
+                        key: Key(result['id']), // Используем уникальный ID из Firebase
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          color: Colors.red,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        onDismissed: (_) {
+                          // Удаляем элемент по его уникальному ID
+                          reactionProvider.deleteResultById(
+                            type: 'measurements',
+                            id: result['id'], // Передаем уникальный ID
+                           
+                          );
+
+                          // Показываем SnackBar с возможностью отмены
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Запись удалена'),
+                              action: SnackBarAction(
+                                label: 'Отмена',
+                                onPressed: () {
+                                  // Восстанавливаем удаленный элемент
+                                  reactionProvider.addResult(
+                                    type: 'measurements', // Указываем тип результата
+                                    time: result['time'],
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                        child: ListTile(
+                          title: Text('${result['time'].toStringAsFixed(0)} мс'),
+                          subtitle: Text(result['date']),
+                        ),
+                      );
+                    },
                   ),
-                  onDismissed: (_) {
-                    reactionProvider.deleteResult(index);
-                  },
-                  child: ListTile(
-                    title: Text('${result['time'].toStringAsFixed(0)} мс'),
-                    subtitle: Text(result['date']),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'Свайпните влево, чтобы удалить запись',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
-                );
-              },
+                ),
+              ],
             ),
+    );
+  }
+
+  void _showClearHistoryDialog(BuildContext context, ReactionProvider provider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Очистить историю?'),
+        content: const Text('Вы уверены, что хотите удалить все результаты?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              'Свайпните влево, чтобы удалить запись',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
+          TextButton(
+            onPressed: () {
+              provider.clearResults();
+              Navigator.pop(context);
+            },
+            child: const Text('Удалить'),
           ),
         ],
       ),
