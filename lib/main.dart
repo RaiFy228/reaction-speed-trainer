@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reaction_speed_trainer/providers/levels_provider.dart';
@@ -9,9 +10,9 @@ import 'screens/level_history_screen.dart';
 
 void main() async{
   WidgetsFlutterBinding.ensureInitialized();
-
+  await Firebase.initializeApp(); // Инициализация Firebase
   final reactionProvider = ReactionProvider();
-  await reactionProvider.loadResults();
+  await reactionProvider.loadResults(); // Загрузка данных из Firebase
   runApp(
     MultiProvider(
       providers: [
