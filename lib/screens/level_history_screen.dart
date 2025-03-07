@@ -74,7 +74,7 @@ class _LevelHistoryScreenState extends State<LevelHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final reactionProvider = Provider.of<ReactionProvider>(context);
-    final results = reactionProvider.results;
+    final results = reactionProvider.levelResults;
 
     return Scaffold(
       appBar: AppBar(
@@ -170,9 +170,10 @@ class _LevelHistoryScreenState extends State<LevelHistoryScreen> {
                                       // Восстанавливаем удаленный элемент
                                       reactionProvider.addResult(
                                         type: 'levels',
-                                        time: result['time'],
+                                        time: result['time'].toDouble(),
                                         levelId: widget.levelId.toString(),
                                         difficulty: _selectedDifficulty!,
+                                        date: result['date'], // Передаем оригинальную дату
                                       );
                                     },
                                   ),
@@ -180,7 +181,7 @@ class _LevelHistoryScreenState extends State<LevelHistoryScreen> {
                               );
                             },
                             child: ListTile(
-                              title: Text('${result['time'].toStringAsFixed(0)} мс'),
+                              title: Text('${result['time'].toStringAsFixed(0)} мс, Ошибки: ${result['errors']} из ${result['repetitions']}'),
                               subtitle: Text(result['date']),
                             ),
                           );

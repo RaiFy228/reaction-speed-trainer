@@ -17,8 +17,10 @@ migrate_working_dir/
 /windows/
 /macos/
 /ios/
-
+/android/app/google-services.json
 # IntelliJ related
+*.json
+*.env
 *.iml
 *.ipr
 *.iws
