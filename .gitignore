@@ -19,6 +19,8 @@ migrate_working_dir/
 /ios/
 
 # IntelliJ related
+*.json
+*.env
 *.iml
 *.ipr
 *.iws
