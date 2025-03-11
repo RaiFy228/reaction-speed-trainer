@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:reaction_speed_trainer/repositories/i_reaction_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -6,6 +6,9 @@ enum SortOrder { ascending, descending }
 
 class ReactionProvider with ChangeNotifier {
   // Отдельные списки для хранения данных разных типов
+  int _selectedRepetitions = 0;
+
+
   List<Map<String, dynamic>> _measurementResults = [];
   List<Map<String, dynamic>> _levelResults = [];
 
@@ -13,7 +16,11 @@ class ReactionProvider with ChangeNotifier {
 
   final IReactionRepository _repository;
 
-  ReactionProvider(this._repository);
+  ReactionProvider(this._repository){
+    setSelectedRepetitions();
+  }
+
+  int get selectedRepetitions => _selectedRepetitions;
 
   SortOrder get sortOrder => _sortOrder;
 
@@ -40,13 +47,11 @@ class ReactionProvider with ChangeNotifier {
   Future<void> loadResults({
     required String type,
     String? levelId,
-    String? difficulty,
   }) async {
     try {
       final results = await _repository.loadResults(
         type: type,
         levelId: levelId,
-        difficulty: difficulty,
       );
 
       if (type == 'measurements') {
@@ -57,7 +62,9 @@ class ReactionProvider with ChangeNotifier {
 
       notifyListeners();
     } catch (e) {
-      print('Ошибка загрузки данных: $e');
+      if (kDebugMode) {
+        print('Ошибка загрузки данных: $e');
+      }
     }
   }
 
@@ -67,7 +74,6 @@ class ReactionProvider with ChangeNotifier {
     int? repetitions,
     int? errors,
     String? levelId,
-    String? difficulty,
     String? date,
   }) async {
     try {
@@ -77,12 +83,13 @@ class ReactionProvider with ChangeNotifier {
         repetitions: repetitions,
         errors: errors,
         levelId: levelId,
-        difficulty: difficulty,
-        date: date
+        date: date,
       );
-      await loadResults(type: type, levelId: levelId, difficulty: difficulty,);
+      await loadResults(type: type, levelId: levelId);
     } catch (e) {
-      print('Ошибка при добавлении результата: $e');
+      if (kDebugMode) {
+        print('Ошибка при добавлении результата: $e');
+      }
     }
   }
 
@@ -90,14 +97,12 @@ class ReactionProvider with ChangeNotifier {
     required String id,
     required String type,
     String? levelId,
-    String? difficulty,
   }) async {
     try {
       await _repository.deleteResultById(
         id: id,
         type: type,
         levelId: levelId,
-        difficulty: difficulty,
       );
 
       if (type == 'measurements') {
@@ -108,7 +113,9 @@ class ReactionProvider with ChangeNotifier {
 
       notifyListeners();
     } catch (e) {
-      print('Ошибка удаления результата по ID: $e');
+      if (kDebugMode) {
+        print('Ошибка удаления результата по ID: $e');
+      }
     }
   }
 
@@ -119,13 +126,25 @@ class ReactionProvider with ChangeNotifier {
       _levelResults.clear();
       notifyListeners();
     } catch (e) {
-      print('Ошибка очистки результатов: $e');
+      if (kDebugMode) {
+        print('Ошибка очистки результатов: $e');
+      }
     }
   }
 
   // Метод для получения выбранного количества повторений
   Future<int> getSelectedRepetitions() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('selectedRepetitions') ?? 5; // 5 - значение по умолчанию
+    _selectedRepetitions = prefs.getInt('selectedRepetitions') ?? 5;
+    notifyListeners();
+    return prefs.getInt('selectedRepetitions') ?? 5;
+
   }
+
+  void setSelectedRepetitions() async {
+     final prefs = await SharedPreferences.getInstance();
+    _selectedRepetitions = prefs.getInt('selectedRepetitions') ?? 5;
+    notifyListeners();
+  }
+  
 }

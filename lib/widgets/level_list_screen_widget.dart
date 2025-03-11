@@ -8,53 +8,18 @@ import '../screens/level_history_screen.dart';
 class LevelsListScreen extends StatelessWidget {
   const LevelsListScreen({super.key});
 
-  Future<void> _showDifficultyDialog(BuildContext context, Level level) async {
-    final selectedDifficulty = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Выберите сложность'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: level.trainingWidgetBuilders.keys.map((difficulty) {
-            return ListTile(
-              title: Text(difficulty),
-              onTap: () => Navigator.pop(context, difficulty),
-            );
-          }).toList(),
+  void _openHistoryScreen(BuildContext context, Level level) {
+    // Переходим на экран истории с выбранным уровнем
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LevelHistoryScreen(
+          levelId: level.id,
+          levelName: level.name, // Передаем название уровня
         ),
       ),
     );
-
-    if (selectedDifficulty != null) {
-      // Переходим на экран тренировки с выбранным уровнем и сложностью
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => TrainingSessionScreen(
-            level: level,
-            difficulty: selectedDifficulty,
-          ),
-        ),
-      );
-    }
   }
-
-  void _openHistoryScreen(BuildContext context, Level level) {
-  // Берем первую доступную сложность по умолчанию
-  final defaultDifficulty = level.trainingWidgetBuilders.keys.first;
-
-  // Переходим на экран истории с выбранным уровнем, сложностью и названием уровня
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => LevelHistoryScreen(
-        levelId: level.id,
-        difficulty: defaultDifficulty, // Передаем первую сложность
-        levelName: level.name, // Передаем название уровня
-      ),
-    ),
-  );
-}
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +27,7 @@ class LevelsListScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Список уровней'),
       ),
       body: ListView.builder(
@@ -77,7 +43,7 @@ class LevelsListScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        level.name,
+                        '${index + 1}. ${level.name}',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Text(level.description),
@@ -89,7 +55,15 @@ class LevelsListScreen extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.play_arrow), // Иконка "Play"
                       onPressed: () {
-                        _showDifficultyDialog(context, level);
+                        // Переходим на экран тренировки
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TrainingSessionScreen(
+                              level: level,
+                            ),
+                          ),
+                        );
                       },
                     ),
                     IconButton(

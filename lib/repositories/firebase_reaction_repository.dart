@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import 'package:reaction_speed_trainer/repositories/i_reaction_repository.dart';
 
 class FirebaseReactionRepository implements IReactionRepository {
@@ -8,14 +9,13 @@ class FirebaseReactionRepository implements IReactionRepository {
 
   String get userId => _auth.currentUser?.uid ?? 'default_user_id';
 
- @override
+  @override
   Future<void> addResult({
     required String type,
     required double time,
     int? repetitions,
     int? errors,
     String? levelId,
-    String? difficulty,
     String? date, // Add this parameter to match the interface
   }) async {
     if (_auth.currentUser == null) {
@@ -32,17 +32,21 @@ class FirebaseReactionRepository implements IReactionRepository {
       DatabaseReference resultRef;
       if (type == 'measurements') {
         resultRef = _database.child('users/$userId/results/measurements').push();
-      } else if (type == 'levels' && levelId != null && difficulty != null) {
+      } else if (type == 'levels' && levelId != null) {
         resultRef = _database
-            .child('users/$userId/results/levels/$levelId/$difficulty')
+            .child('users/$userId/results/levels/$levelId')
             .push();
       } else {
         throw Exception('Некорректный тип результата');
       }
       await resultRef.set(newResult);
-      print('Данные успешно записаны в базу: $newResult');
+      if (kDebugMode) {
+        print('Данные успешно записаны в базу: $newResult');
+      }
     } catch (e) {
-      print('Ошибка при добавлении результата: $e');
+      if (kDebugMode) {
+        print('Ошибка при добавлении результата: $e');
+      }
     }
   }
 
@@ -50,7 +54,6 @@ class FirebaseReactionRepository implements IReactionRepository {
   Future<List<Map<String, dynamic>>> loadResults({
     required String type,
     String? levelId,
-    String? difficulty,
   }) async {
     if (_auth.currentUser == null) {
       return [];
@@ -61,8 +64,8 @@ class FirebaseReactionRepository implements IReactionRepository {
 
       if (type == 'measurements') {
         ref = _database.child('users/$userId/results/measurements');
-      } else if (type == 'levels' && levelId != null && difficulty != null) {
-        ref = _database.child('users/$userId/results/levels/$levelId/$difficulty');
+      } else if (type == 'levels' && levelId != null) {
+        ref = _database.child('users/$userId/results/levels/$levelId');
       } else {
         throw Exception('Некорректный тип результата');
       }
@@ -83,7 +86,9 @@ class FirebaseReactionRepository implements IReactionRepository {
         return [];
       }
     } catch (e) {
-      print('Ошибка загрузки данных: $e');
+      if (kDebugMode) {
+        print('Ошибка загрузки данных: $e');
+      }
       return [];
     }
   }
@@ -93,26 +98,27 @@ class FirebaseReactionRepository implements IReactionRepository {
     required String id,
     required String type,
     String? levelId,
-    String? difficulty,
   }) async {
     if (_auth.currentUser == null) {
       throw Exception('Пользователь не авторизован');
     }
 
-   try {
+    try {
       DatabaseReference ref;
 
       if (type == 'measurements') {
         ref = _database.child('users/$userId/results/measurements/$id');
-      } else if (type == 'levels' && levelId != null && difficulty != null) {
-        ref = _database.child('users/$userId/results/levels/$levelId/$difficulty/$id');
+      } else if (type == 'levels' && levelId != null) {
+        ref = _database.child('users/$userId/results/levels/$levelId/$id');
       } else {
         throw Exception('Некорректный тип результата');
       }
 
       await ref.remove();
     } catch (e) {
-      print('Ошибка удаления результата по ID: $e');
+      if (kDebugMode) {
+        print('Ошибка удаления результата по ID: $e');
+      }
     }
   }
 
@@ -125,7 +131,9 @@ class FirebaseReactionRepository implements IReactionRepository {
     try {
       await _database.child('users/$userId/results').remove();
     } catch (e) {
-      print('Ошибка очистки результатов: $e');
+      if (kDebugMode) {
+        print('Ошибка очистки результатов: $e');
+      }
     }
   }
 }

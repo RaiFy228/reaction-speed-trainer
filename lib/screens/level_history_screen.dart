@@ -4,13 +4,11 @@ import '../providers/reaction_provider.dart';
 
 class LevelHistoryScreen extends StatefulWidget {
   final int levelId;
-  final String difficulty;
   final String levelName;
 
   const LevelHistoryScreen({
     super.key,
     required this.levelId,
-    required this.difficulty, 
     required this.levelName,
   });
 
@@ -19,33 +17,15 @@ class LevelHistoryScreen extends StatefulWidget {
 }
 
 class _LevelHistoryScreenState extends State<LevelHistoryScreen> {
-  String? _selectedDifficulty;
-
   @override
   void initState() {
     super.initState();
-    _selectedDifficulty = widget.difficulty; // Устанавливаем начальную сложность
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<ReactionProvider>(context, listen: false).loadResults(
         type: 'levels',
         levelId: widget.levelId.toString(),
-        difficulty: widget.difficulty,
       );
     });
-  }
-
-  void _onDifficultyChanged(String? value) {
-    setState(() {
-      _selectedDifficulty = value;
-    });
-
-    if (value != null) {
-      Provider.of<ReactionProvider>(context, listen: false).loadResults(
-        type: 'levels',
-        levelId: widget.levelId.toString(),
-        difficulty: value,
-      );
-    }
   }
 
   void _showClearHistoryDialog(BuildContext context, ReactionProvider provider) {
@@ -108,16 +88,6 @@ class _LevelHistoryScreenState extends State<LevelHistoryScreen> {
                         ),
                       ],
                     ),
-                    DropdownButton<String>(
-                        value: _selectedDifficulty,
-                        onChanged: _onDifficultyChanged,
-                        items: ['Легко', 'Средне', 'Сложно']
-                            .map((difficulty) => DropdownMenuItem(
-                                  value: difficulty,
-                                  child: Text(difficulty),
-                                ))
-                            .toList(),
-                      ),
                     IconButton(
                       icon: const Icon(Icons.delete_forever),
                       onPressed: () {
@@ -131,72 +101,68 @@ class _LevelHistoryScreenState extends State<LevelHistoryScreen> {
           ),
         ),
       ),
-      body: _selectedDifficulty == null
-          ? const Center(child: Text('Выберите сложность'))
-          : results.isEmpty
-              ? const Center(child: Text('Нет сохраненных результатов'))
-              : Column(
-                  children: [
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: results.length,
-                        itemBuilder: (context, index) {
-                          final result = results[index];
-                          return Dismissible(
-                            key: Key(result['id']), // Используем уникальный ID из Firebase
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              color: Colors.red,
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 20),
-                              child: const Icon(Icons.delete, color: Colors.white),
-                            ),
-                            onDismissed: (_) {
-                              // Удаляем элемент по его уникальному ID
-                              reactionProvider.deleteResultById(
-                                id: result['id'],
-                                type: 'levels',
-                                levelId: widget.levelId.toString(),
-                                difficulty: _selectedDifficulty!,
-                              );
+      body: results.isEmpty
+          ? const Center(child: Text('Нет сохраненных результатов'))
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: results.length,
+                    itemBuilder: (context, index) {
+                      final result = results[index];
+                      return Dismissible(
+                        key: Key(result['id']), // Используем уникальный ID из Firebase
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          color: Colors.red,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        onDismissed: (_) {
+                          // Удаляем элемент по его уникальному ID
+                          reactionProvider.deleteResultById(
+                            id: result['id'],
+                            type: 'levels',
+                            levelId: widget.levelId.toString(),
+                          );
 
-                              // Показываем SnackBar с возможностью отмены
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('Запись удалена'),
-                                  action: SnackBarAction(
-                                    label: 'Отмена',
-                                    onPressed: () {
-                                      // Восстанавливаем удаленный элемент
-                                      reactionProvider.addResult(
-                                        type: 'levels',
-                                        time: result['time'].toDouble(),
-                                        levelId: widget.levelId.toString(),
-                                        difficulty: _selectedDifficulty!,
-                                        date: result['date'], // Передаем оригинальную дату
-                                      );
-                                    },
-                                  ),
-                                ),
-                              );
-                            },
-                            child: ListTile(
-                              title: Text('${result['time'].toStringAsFixed(0)} мс, Ошибки: ${result['errors']} из ${result['repetitions']}'),
-                              subtitle: Text(result['date']),
+                          // Показываем SnackBar с возможностью отмены
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Запись удалена'),
+                              action: SnackBarAction(
+                                label: 'Отмена',
+                                onPressed: () {
+                                  // Восстанавливаем удаленный элемент
+                                  reactionProvider.addResult(
+                                    type: 'levels',
+                                    time: result['time'].toDouble(),
+                                    levelId: widget.levelId.toString(),
+                                    date: result['date'], // Передаем оригинальную дату
+                                  );
+                                },
+                              ),
                             ),
                           );
                         },
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        'Свайпните влево, чтобы удалить запись',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ),
-                  ],
+                        child: ListTile(
+                          title: Text('${result['time'].toStringAsFixed(0)} мс, Ошибки: ${result['errors']}'),
+                          subtitle: Text(result['date']),
+                        ),
+                      );
+                    },
+                  ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'Свайпните влево, чтобы удалить запись',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
