@@ -25,16 +25,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final results = reactionProvider.measurementResults;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('История результатов'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_forever),
-            onPressed: () {
-              _showClearHistoryDialog(context, reactionProvider);
-            },
+     appBar: AppBar(
+        title: Text(
+          'История результатов',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(40), // Высота нижней части
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                DropdownButton<SortOrder>(
+                  value: reactionProvider.sortOrder,
+                  onChanged: (value) {
+                    reactionProvider.setSortOrder(value!);
+                  },
+                  items: [
+                    DropdownMenuItem(
+                      value: SortOrder.descending,
+                      child: Text('Новые сверху'),
+                    ),
+                    DropdownMenuItem(
+                      value: SortOrder.ascending,
+                      child: Text('Старые сверху'),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_forever),
+                  onPressed: () {
+                    _showClearHistoryDialog(context, reactionProvider);
+                  },
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
       body: results.isEmpty
           ? const Center(child: Text('Нет сохраненных результатов'))
@@ -78,7 +106,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     );
                   },
                   child: ListTile(
-                    title: Text('${result['time'].toStringAsFixed(0)} мс, Ошибки: ${result['errors']} из ${result['repetitions']}'),
+                    title: Text('${result['time'].toStringAsFixed(0)} мс, Ошибки: ${result['errors']}'),
                     subtitle: Text(result['date']),
                   ),
                 );

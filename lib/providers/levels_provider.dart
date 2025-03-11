@@ -1,64 +1,68 @@
 import 'package:flutter/material.dart';
 import 'package:reaction_speed_trainer/widgets/levels/level_1_widget.dart';
+import 'package:reaction_speed_trainer/widgets/levels/level_2_widget.dart';
+import 'package:reaction_speed_trainer/widgets/levels/level_3_widget.dart';
+import 'package:reaction_speed_trainer/widgets/levels/level_4_widget.dart';
+import 'package:reaction_speed_trainer/widgets/levels/level_5_widget.dart';
 import '../models/level.dart';
 
 class LevelsProvider with ChangeNotifier {
   final List<Level> _levels = [
     Level(
       id: 1,
-      name: 'Уровень 1',
-      description: 'Нажмите на блок, когда он изменит цвет.',
-      trainingWidgetBuilders: {
-        'Легко': (context) => const Level1EasyWidget(),
-        'Средне': (context) => const Level1MediumWidget(),
-        'Сложно': (context) => const Level1HardWidget(),
-      },
-      history: {
-        'Легко': [],
-        'Средне': [],
-        'Сложно': [],
-      },
+      name: 'Ложный сигнал',
+      description: 'Нажимай только на зелёный',
+      trainingWidgetBuilder: (context) => const Level1Widget(),
+      history: [],
     ),
     Level(
       id: 2,
-      name: 'Уровень 2',
-      description: 'Поймайте движущийся объект.',
-      trainingWidgetBuilders: {
-        // 'Легко': (context) => const Level2EasyWidget(),
-        // 'Средне': (context) => const Level2MediumWidget(),
-        // 'Сложно': (context) => const Level2HardWidget(),
-      },
-      history: {
-        'Легко': [],
-        'Средне': [],
-        'Сложно': [],
-      },
+      name: 'Выбери цвет',
+      description: 'Выбери правильный цвет',
+      trainingWidgetBuilder: (context) => const Level2Widget(),
+      history: [],
     ),
-    // Добавьте остальные уровни аналогично
+    Level(
+      id: 3,
+      name: 'Внезавное появление',
+      description: 'Нажми на появивщийся объект',
+      trainingWidgetBuilder: (context) => const Level3Widget(),
+      history: [],
+    ),
+    Level(
+      id: 4,
+      name: 'Динамический рост',
+      description: 'Нажми, когда круг вырастет',
+      trainingWidgetBuilder: (context) => const Level4Widget(),
+      history: [],
+    ),
+    Level(
+      id: 5,
+      name: 'Поиск цвета',
+      description: 'Найди нужный цвет',
+      trainingWidgetBuilder: (context) => const Level5Widget(),
+      history: [],
+    ),
   ];
 
   List<Level> get levels => _levels;
 
-  void addResult(int levelId, String difficulty, double reactionTime) {
+  void addResult(int levelId, double reactionTime) {
     final level = _levels.firstWhere((l) => l.id == levelId);
-    if (!level.history.containsKey(difficulty)) {
-      level.history[difficulty] = [];
-    }
-    level.history[difficulty]?.add(LevelResult(reactionTime: reactionTime, date: DateTime.now()));
+    level.history.add(LevelResult(reactionTime: reactionTime, date: DateTime.now()));
     notifyListeners();
   }
 
-  void clearHistory(int levelId, String difficulty) {
+  void clearHistory(int levelId) {
     final level = _levels.firstWhere((l) => l.id == levelId);
-    level.history[difficulty]?.clear();
+    level.history.clear();
     notifyListeners();
   }
 
-  double getAverageReactionTime(int levelId, String difficulty) {
+  double getAverageReactionTime(int levelId) {
     final level = _levels.firstWhere((l) => l.id == levelId);
-    final results = level.history[difficulty];
-    if (results == null || results.isEmpty) return 0;
-    final total = results.map((r) => r.reactionTime).reduce((a, b) => a + b);
-    return total / results.length;
+    if (level.history.isEmpty) return 0;
+    final total = level.history.map((r) => r.reactionTime).reduce((a, b) => a + b);
+    return total / level.history.length;
   }
 }

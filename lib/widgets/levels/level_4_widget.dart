@@ -1,33 +1,32 @@
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reaction_speed_trainer/providers/reaction_provider.dart';
 
-class Level3Widget extends StatefulWidget {
-  const Level3Widget({super.key});
+class Level4Widget extends StatefulWidget {
+  const Level4Widget({super.key});
 
   @override
-  State<Level3Widget> createState() => _Level3WidgetState();
+  State<Level4Widget> createState() => _Level4WidgetState();
 }
 
-class _Level3WidgetState extends State<Level3Widget> {
-  // Состояния Level3Widget
+class _Level4WidgetState extends State<Level4Widget> {
   bool _isWaitingForStart = true;
   bool _isObjectVisible = false;
+  bool _isReady = false; // Флаг, показывающий, что круг достиг цели
 
-  // Параметры появления объекта
-  bool? _isValidObject; // true – целевой, false – ложный
-  double _objectX = 0.0;
-  double _objectY = 0.0;
-  final double _objectSize = 80.0; // размер объекта
+  // Параметры роста круга
+  double _currentDiameter = 30.0;
+  double _targetDiameter = 150.0; // Будет меняться случайным образом
+  double _growthStep = 2.0; // Будет меняться случайным образом
+  final int _growthInterval = 50;
 
-  // Таймеры и время
   Timer? _delayTimer;
-  Timer? _objectTimer;
+  Timer? _growthTimer;
   DateTime? _startTime;
 
-  // Результаты
   final List<double> _reactionTimes = [];
   double _reactionTimeSum = 0;
   int _currentRepetition = 1;
@@ -47,103 +46,94 @@ class _Level3WidgetState extends State<Level3Widget> {
     setState(() {
       _isWaitingForStart = true;
       _isObjectVisible = false;
+      _isReady = false;
+      _currentDiameter = 30.0;
       _startTime = null;
       _reactionTimeSum = 0;
       _currentRepetition = 1;
       _errors = 0;
       _reactionTimes.clear();
       _delayTimer?.cancel();
-      _objectTimer?.cancel();
+      _growthTimer?.cancel();
     });
   }
 
   void _startTest() {
-    // Сбрасываем состояние появления объекта
     setState(() {
       _isWaitingForStart = false;
       _isObjectVisible = false;
+      _isReady = false;
     });
-    // Задержка перед появлением объекта (от 1 до 3 секунд)
-    int delayMs = Random().nextInt(1000) + 1000;
-    _delayTimer = Timer(Duration(milliseconds: delayMs), _showObject);
+
+    // Генерация случайных параметров:
+    // - Конечный диаметр теперь от 200 до 350 (больше чем раньше)
+    _targetDiameter = Random().nextInt(190) + 200; // 200 - 390
+    _currentDiameter = Random().nextInt(100) + 20;    // Начальный диаметр: от 20 до 120
+    _growthStep = Random().nextDouble() * 20 + 2;       // Скорость роста: от 2 до 22
+
+    _delayTimer = Timer(Duration(milliseconds: 500), _startGrowingCircle);
+  }
+
+  void _startGrowingCircle() {
+    setState(() {
+      _isObjectVisible = true;
+    });
+
+    // Таймер роста: останавливаем, когда круг достигнет целевого диаметра.
+    _growthTimer = Timer.periodic(Duration(milliseconds: _growthInterval), (timer) {
+      if (_currentDiameter + _growthStep >= _targetDiameter) {
+        setState(() {
+          _currentDiameter = _targetDiameter;
+          _isReady = true; // Круг готов, становится зелёным
+        });
+        timer.cancel();
+        // Время реакции начинается в этот момент
+        _startTime = DateTime.now();
+      } else {
+        // Случайным образом меняем скорость роста (примерно 20% шанс на тик)
+        if (Random().nextDouble() < 0.2) {
+          _growthStep = Random().nextDouble() * 20 + -2;
+        }
+        setState(() => _currentDiameter += _growthStep);
+      }
+    });
   }
 
   void _handleObjectTap() {
-  if (!_isObjectVisible) return;
-  _objectTimer?.cancel();
-  setState(() {
-    _isObjectVisible = false;
-  });
+    if (!_isObjectVisible) return;
 
-  if (_isValidObject == true) {
-    // Засекаем время реакции
+    // Если круг ещё не достиг нужного размера, считаем, что нажатие слишком рано
+    if (!_isReady) {
+      _growthTimer?.cancel();
+      setState(() => _isObjectVisible = false);
+      _errors++;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Слишком рано!'), duration: Duration(milliseconds: 500)),
+      );
+      _startTest();
+      return;
+    }
+
+    // Измеряем время реакции с момента, когда круг стал готов
     final reactionTime = DateTime.now().difference(_startTime!).inMilliseconds;
     _reactionTimes.add(reactionTime.toDouble());
     _reactionTimeSum += reactionTime;
+
+    setState(() => _isObjectVisible = false);
+
     if (_reactionTimes.length >= _selectedRepetitions) {
       _showResults();
     } else {
-     _currentRepetition++; 
-       _nextRound(); 
+      _currentRepetition++;
+      _startTest();
     }
-  } else {
-    // Ошибка – ложный объект нажат
-    _errors++;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Ошибка, ложный объект!'), duration: Duration(milliseconds: 500))
-    );
-    _nextRound(); 
   }
-}
-
-void _showObject() {
-  _isValidObject = Random().nextInt(100) < 50;
-
-  final screenSize = MediaQuery.of(context).size;
-  double maxX = screenSize.width - _objectSize;
-  double maxY = screenSize.height - _objectSize - 370;
-  _objectX = Random().nextDouble() * maxX;
-  _objectY = Random().nextDouble() * maxY + 100;
-
-  setState(() {
-    _isObjectVisible = true;
-  });
-
-  if (_isValidObject == true) {
-    _startTime = DateTime.now();
-  }
-
-  _objectTimer = Timer(const Duration(milliseconds: 1000), () {
-    if (_isObjectVisible) {
-      setState(() {
-        _isObjectVisible = false;
-      });
-
-      if (_isValidObject == true) {
-        _errors++;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка, не успел!'), duration: Duration(milliseconds: 500))
-        );
-      }
-
-      _nextRound();
-    }
-  });
-}
-
-void _nextRound() {
-    Timer(const Duration(milliseconds: 500), () {
-      if (mounted) _startTest();
-    });
-  }
-
 
   void _showResults() {
-    // Вычисляем среднее время реакции только по целевым раундам
     final averageTime = _reactionTimes.isNotEmpty ? _reactionTimeSum / _reactionTimes.length : 0;
     Provider.of<ReactionProvider>(context, listen: false).addResult(
       type: 'levels',
-      levelId: '3',
+      levelId: '4',
       time: averageTime.toDouble(),
       repetitions: _selectedRepetitions,
       errors: _errors,
@@ -163,7 +153,7 @@ void _nextRound() {
               const SizedBox(height: 10),
               Text('Ошибки: $_errors', style: const TextStyle(fontSize: 16, color: Colors.red)),
               const SizedBox(height: 20),
-              ..._reactionTimes.asMap().entries.map((e) => 
+              ..._reactionTimes.asMap().entries.map((e) =>
                 Text('Повторение ${e.key + 1}: ${e.value.toStringAsFixed(2)} мс')
               ),
             ],
@@ -209,14 +199,14 @@ void _nextRound() {
   @override
   void dispose() {
     _delayTimer?.cancel();
-    _objectTimer?.cancel();
+    _growthTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-       appBar: AppBar(
+      appBar: AppBar(
         automaticallyImplyLeading: false,
         toolbarHeight: 70.0,
         actions: [
@@ -252,7 +242,7 @@ void _nextRound() {
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
                 child: Text(
-                  'Нажимай только на зеленый круг!',
+                  'Нажми, когда круг достигнет нужного размера!',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
@@ -261,24 +251,40 @@ void _nextRound() {
               _buildControlButton(),
             ],
           ),
-          // Объект появляется в случайном месте экрана
           if (_isObjectVisible)
-            Positioned(
-              left: _objectX,
-              top: _objectY,
+            Center(
               child: GestureDetector(
                 onTap: _handleObjectTap,
-                child: Container(
-                  width: _objectSize,
-                  height: _objectSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _isValidObject == true ? Colors.green : Colors.red,
-                     border: Border.all(
-                      color: Theme.of(context).textTheme.bodyLarge!.color!,
-                      width: 2,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Черная граница целевого диаметра
+                    Container(
+                      width: _targetDiameter,
+                      height: _targetDiameter,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(context).textTheme.bodyLarge!.color!,
+                          width: 2,
+                        ),
+                      ),
                     ),
-                  ),
+                    // Анимированный круг
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 50),
+                      width: _currentDiameter,
+                      height: _currentDiameter,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _isReady ? Colors.green : Colors.transparent,
+                        border: Border.all(
+                          color: Theme.of(context).textTheme.bodyLarge!.color!,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

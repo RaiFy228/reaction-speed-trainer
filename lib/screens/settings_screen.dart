@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:reaction_speed_trainer/providers/reaction_provider.dart';
+import 'package:reaction_speed_trainer/providers/theme_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -11,7 +14,6 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   int _selectedRepetitions = 5; // Значение по умолчанию
-  final List<int> _repetitionOptions = List.generate(15, (index) => index + 1); // От 1 до 15
 
   @override
   void initState() {
@@ -31,9 +33,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // Сохранение выбранного значения в SharedPreferences
-  Future<void> _saveSelectedRepetitions(int value) async {
+  void _saveSelectedRepetitions(int value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('selectedRepetitions', value);
+
+    if (mounted) {
+      final reactionProvider = Provider.of<ReactionProvider>(context, listen: false);
+      reactionProvider.setSelectedRepetitions();
+    }
+  }
+
+  // Уменьшение количества повторений
+  void _decreaseRepetitions() {
+    if (_selectedRepetitions > 1) {
+      setState(() {
+        _selectedRepetitions--;
+      });
+      _saveSelectedRepetitions(_selectedRepetitions);
+    }
+  }
+
+  // Увеличение количества повторений
+  void _increaseRepetitions() {
+    if (_selectedRepetitions < 10) {
+      setState(() {
+        _selectedRepetitions++;
+      });
+      _saveSelectedRepetitions(_selectedRepetitions);
+    }
   }
 
   Future<void> _signOut(BuildContext context) async {
@@ -42,7 +69,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       // Проверяем, что виджет все еще существует перед навигацией
       if (context.mounted) {
-        Navigator.pushReplacementNamed(context, '/');
+        Navigator.pushReplacementNamed(context, '/login');
       }
     } catch (e) {
       // Проверяем, что виджет все еще существует перед показом SnackBar
@@ -56,6 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Настройки'),
@@ -70,23 +98,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            DropdownButton<int>(
-              value: _selectedRepetitions,
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _selectedRepetitions = value;
-                  });
-                  _saveSelectedRepetitions(value); // Сохраняем выбранное значение
-                }
-              },
-              items: _repetitionOptions.map((int value) {
-                return DropdownMenuItem<int>(
-                  value: value,
-                  child: Text('$value повторений'),
-                );
-              }).toList(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Кнопка уменьшения
+                IconButton(
+                  icon: const Icon(Icons.arrow_left),
+                  onPressed: _decreaseRepetitions,
+                ),
+                // Отображение текущего значения
+                Text(
+                  '$_selectedRepetitions',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                // Кнопка увеличения
+                IconButton(
+                  icon: const Icon(Icons.arrow_right),
+                  onPressed: _increaseRepetitions,
+                ),
+              ],
             ),
+            const SizedBox(height: 20),
+            SwitchListTile(
+            title: const Text('Темная тема'),
+            value: themeProvider.isDarkMode,
+            onChanged: (value) => themeProvider.toggleTheme(),
+          ),
             const SizedBox(height: 20),
             ListTile(
               title: const Text('Выйти из аккаунта'),

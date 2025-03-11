@@ -4,29 +4,54 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reaction_speed_trainer/providers/reaction_provider.dart';
 
-class Level1EasyWidget extends StatefulWidget {
-  const Level1EasyWidget({super.key});
+class Level1Widget extends StatefulWidget {
+  const Level1Widget({super.key});
 
   @override
-  State<Level1EasyWidget> createState() => _Level1EasyWidgetState();
+  State<Level1Widget> createState() => _Level1WidgetState();
 }
 
-class _Level1EasyWidgetState extends State<Level1EasyWidget> {
-  bool _isWaitingForStart = true; // Ожидание первого нажатия
-  bool _isWaitingForGreen = false; // Ожидание смены цвета на зеленый
-  bool _isShowingResult = false; // Отображение результата
+class _Level1WidgetState extends State<Level1Widget> {
+  bool _isWaitingForStart = true;
+  bool _isWaitingForGreen = false;
+  bool _isShowingResult = false;
+  bool _isRedActive = false; // Флаг для активности красного
   Timer? _timer;
   DateTime? _startTime;
-  double? _reactionTime;
+  double? _reactionTimeSum;
+  int _currentRepetition = 1;
+  int _errors = 0;
+  int _selectedRepetitions = 5;
+  final List<double> _reactionTimes = [];
+
+
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSelectedRepetitions();
+  }
+
+  Future<void> _loadSelectedRepetitions() async {
+    final reactionProvider = Provider.of<ReactionProvider>(context, listen: false);
+    final repetitions = await reactionProvider.getSelectedRepetitions();
+    setState(() {
+      _selectedRepetitions = repetitions;
+    });
+  }
 
   void _resetState() {
     setState(() {
       _isWaitingForStart = true;
       _isWaitingForGreen = false;
       _isShowingResult = false;
+      _isRedActive = false;
       _startTime = null;
-      _reactionTime = null;
-      _timer?.cancel(); // Отменяем таймер, если он активен
+      _reactionTimeSum = null;
+      _currentRepetition = 1;
+      _errors = 0;
+      _reactionTimes.clear();
+      _timer?.cancel();
     });
   }
 
@@ -35,13 +60,29 @@ class _Level1EasyWidgetState extends State<Level1EasyWidget> {
       _isWaitingForStart = false;
       _isWaitingForGreen = true;
     });
+    _nextMeasurement();
+  }
 
-    // Случайная задержка перед сменой цвета на зеленый
-    _timer = Timer(Duration(seconds: Random().nextInt(5) + 2), () {
+  void _nextMeasurement() {
+    _timer = Timer(Duration(seconds: Random().nextInt(2) + 2), () {
       if (mounted) {
         setState(() {
           _isWaitingForGreen = false;
-          _startTime = DateTime.now(); // Начало измерения времени реакции
+          _isRedActive = Random().nextBool(); // Случайное включение красного
+            if (_isRedActive) {
+            // Таймер для того, чтобы красный цвет исчезал через 1-2 секунды
+             _timer = Timer(const Duration(seconds: 1), () {
+              if (mounted) {
+                setState(() {
+                  _isRedActive = false;
+                  _isWaitingForGreen = true;
+                });
+                _nextMeasurement();
+              }
+            });
+          } else {
+            _startTime = DateTime.now();
+          }
         });
       }
     });
@@ -49,232 +90,199 @@ class _Level1EasyWidgetState extends State<Level1EasyWidget> {
 
   void _onTap() {
     if (_isWaitingForStart) {
-      // Первое нажатие для начала теста
-      _startTest();
-    } else if (!_isWaitingForGreen && !_isShowingResult) {
-      // Нажатие на зеленый блок
-      final reactionTime = DateTime.now().difference(_startTime!).inMilliseconds.toDouble();
-      Provider.of<ReactionProvider>(context, listen: false).addResult(
-        type: 'levels',
-        levelId: '1', // ID уровня
-        difficulty: 'Легко', // Сложность
-        time: reactionTime,
+      return;
+    } else if (_isWaitingForGreen) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка, слишком рано!'), duration: Duration(milliseconds: 500))
       );
       setState(() {
-        _reactionTime = reactionTime;
-        _isShowingResult = true; // Показываем результат
+        _timer?.cancel();
+        _isWaitingForGreen = true;
+        _errors++;
       });
-    } else if (_isShowingResult) {
-      // Нажатие после отображения результата
-      _resetState(); // Возвращаемся к начальному состоянию
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel(); // Отменяем таймер при уничтожении виджета
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(_isShowingResult ? '${(_reactionTime!).toStringAsFixed(0)} мс' : 'Уровень 1 - Легко'),
-          const SizedBox(height: 20),
-          GestureDetector(
-            onTap: _onTap,
-            child: Container(
-              width: 200,
-              height: 200,
-              color: _getColor(),
-              child: Center(
-                child: _getText(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _resetState,
-            child: const Text('Сбросить'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getColor() {
-    if (_isWaitingForStart) {
-      return Colors.grey; // Серый цвет до начала теста
-    } else if (_isWaitingForGreen) {
-      return Colors.grey; // Серый цвет во время ожидания
-    } else if (_isShowingResult) {
-      return Colors.blue; // Синий цвет при отображении результата
-    } else {
-      return Colors.green; // Зеленый цвет для нажатия
-    }
-  }
-
-  Widget _getText() {
-    if (_isWaitingForStart) {
-      return const Text('Нажмите, чтобы начать');
-    } else if (_isWaitingForGreen) {
-      return const Text('Ждите...');
-    } else if (_isShowingResult) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('${(_reactionTime!).toStringAsFixed(0)} мс'),
-          const Text('Нажмите, чтобы продолжить'),
-        ],
+      _nextMeasurement();
+    } else if (_isRedActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка, не тот цвет!'), duration: Duration(milliseconds: 500))
       );
-    } else {
-      return const Text('Нажмите!');
-    }
-  }
-}
+      setState(() {
+        _timer?.cancel();
+        _errors++;
+        _isRedActive = false;
+        _isWaitingForGreen = true;
+      });
+      _nextMeasurement();
+    } else if (!_isWaitingForGreen && !_isShowingResult) {
+      final reactionTime = DateTime.now().difference(_startTime!).inMilliseconds.toDouble();
+      
+      setState(() {
+        _reactionTimes.add(reactionTime);
+        _reactionTimeSum = (_reactionTimeSum ?? 0) + reactionTime;
+      });
 
-class Level1MediumWidget extends StatefulWidget {
-  const Level1MediumWidget({super.key});
-
-  @override
-  State<Level1MediumWidget> createState() => _Level1MediumWidgetState();
-}
-
-class _Level1MediumWidgetState extends State<Level1MediumWidget> {
-  bool _isWaitingForStart = true; // Ожидание первого нажатия
-  bool _isWaitingForGreen = false; // Ожидание смены цвета на зеленый
-  bool _isShowingResult = false; // Отображение результата
-  Timer? _timer;
-  DateTime? _startTime;
-  double? _reactionTime;
-
-  void _resetState() {
-    setState(() {
-      _isWaitingForStart = true;
-      _isWaitingForGreen = false;
-      _isShowingResult = false;
-      _startTime = null;
-      _reactionTime = null;
-      _timer?.cancel(); // Отменяем таймер, если он активен
-    });
-  }
-
-  void _startTest() {
-    setState(() {
-      _isWaitingForStart = false;
-      _isWaitingForGreen = true;
-    });
-
-    // Случайная задержка перед сменой цвета на зеленый
-    _timer = Timer(Duration(seconds: Random().nextInt(5) + 2), () {
-      if (mounted) {
+      if (_currentRepetition >= _selectedRepetitions) {
+        _showResults();
+      } else {
         setState(() {
-          _isWaitingForGreen = false;
-          _startTime = DateTime.now(); // Начало измерения времени реакции
+          _currentRepetition++;
+          _isWaitingForGreen = true;
         });
+        _nextMeasurement();
       }
-    });
-  }
-
-  void _onTap() {
-    if (_isWaitingForStart) {
-      // Первое нажатие для начала теста
-      _startTest();
-    } else if (!_isWaitingForGreen && !_isShowingResult) {
-      // Нажатие на зеленый блок
-      final reactionTime = DateTime.now().difference(_startTime!).inMilliseconds.toDouble();
-      Provider.of<ReactionProvider>(context, listen: false).addResult(
-        type: 'levels',
-        levelId: '1', // ID уровня
-        difficulty: 'Средне', // Сложность
-        time: reactionTime,
-      );
-      setState(() {
-        _reactionTime = reactionTime;
-        _isShowingResult = true; // Показываем результат
-      });
-    } else if (_isShowingResult) {
-      // Нажатие после отображения результата
-      _resetState(); // Возвращаемся к начальному состоянию
     }
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel(); // Отменяем таймер при уничтожении виджета
-    super.dispose();
+  void _showResults() {
+    Provider.of<ReactionProvider>(context, listen: false).addResult(
+      type: 'levels',
+      levelId: '1',
+      time: _reactionTimeSum! / _selectedRepetitions,
+      repetitions: _selectedRepetitions,
+      errors: _errors,
+    );
+
+    _showResultsDialog();
+  }
+
+  void _showResultsDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Результат', textAlign: TextAlign.center),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Среднее время: ${(_reactionTimeSum! / _selectedRepetitions).toStringAsFixed(2)} мс',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              Text('Ошибки: $_errors', style: const TextStyle(fontSize: 16, color: Colors.red)),
+              const SizedBox(height: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: List.generate(
+                  _reactionTimes.length,
+                  (index) => Text('Повторение ${index + 1} - ${_reactionTimes[index].toStringAsFixed(2)} мс'),
+                ),
+              ), 
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _resetState();
+              },
+              child: const Text('Продолжить'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(_isShowingResult ? '${(_reactionTime!).toStringAsFixed(0)} мс' : 'Уровень 1 - средне'),
-          const SizedBox(height: 20),
-          GestureDetector(
-            onTap: _onTap,
-            child: Container(
-              width: 200,
-              height: 200,
-              color: _getColor(),
-              child: Center(
-                child: _getText(),
-              ),
+    return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        toolbarHeight: 70.0,
+        actions: [
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2.0),
+                        child: Text(
+                          'Повторение: $_currentRepetition/$_selectedRepetitions',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2.0),
+                        child: Text(
+                          'Ошибки: $_errors',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _resetState,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _resetState,
-            child: const Text('Сбросить'),
-          ),
         ],
+      ),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Text(
+                'Нажимай только на зеленый',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 50),
+            GestureDetector(
+              onTap: _onTap,
+              child: Container(
+                width: 300,
+                height: 350,
+                decoration: BoxDecoration(
+                  color: _isWaitingForStart ? Colors.transparent : _getColor(),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(
+                    color: Theme.of(context).textTheme.bodyLarge!.color!,
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton(
+                onPressed: _isWaitingForStart ? _startTest : null,
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Theme.of(context).textTheme.bodyLarge!.color,
+                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8), // Скругление углов
+                    ),
+                  side: BorderSide(
+                    color: Theme.of(context).textTheme.bodyLarge!.color!,
+                    width: 2,
+                  ),
+                ),
+                child: Text(
+                  _isWaitingForStart ? 'Начать тест' : 'Идет тест...',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Color _getColor() {
-    if (_isWaitingForStart) {
-      return Colors.grey; // Серый цвет до начала теста
-    } else if (_isWaitingForGreen) {
-      return Colors.grey; // Серый цвет во время ожидания
-    } else if (_isShowingResult) {
-      return Colors.blue; // Синий цвет при отображении результата
-    } else {
-      return Colors.green; // Зеленый цвет для нажатия
-    }
+    if (_isRedActive) return Colors.red; // Появляется красный, если флаг установлен
+    if (_isWaitingForGreen) return Colors.transparent;
+    return Colors.green;
   }
 
-  Widget _getText() {
-    if (_isWaitingForStart) {
-      return const Text('Нажмите, чтобы начать');
-    } else if (_isWaitingForGreen) {
-      return const Text('Ждите...');
-    } else if (_isShowingResult) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('${(_reactionTime!).toStringAsFixed(0)} мс'),
-          const Text('Нажмите, чтобы продолжить'),
-        ],
-      );
-    } else {
-      return const Text('Нажмите!');
-    }
-  }
-}
-
-class Level1HardWidget extends StatelessWidget {
-  const Level1HardWidget({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Уровень 1 - Сложно'),
-    );
-  }
 }

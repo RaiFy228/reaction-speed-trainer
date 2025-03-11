@@ -12,18 +12,26 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _isWaitingForStart = true; // Ожидание первого нажатия
-  bool _isWaitingForGreen = false; // Ожидание смены цвета на зеленый
-  bool _isShowingResult = false; // Отображение результата
+  bool _isWaitingForStart = true;
+  bool _isWaitingForGreen = false;
+  bool _isShowingResult = false;
   bool _isTooEarly = false;
-  bool _isEnd = false; // Состояние "слишком рано"
   Timer? _timer;
   DateTime? _startTime;
-  double? _reactionTime;
   double? _reactionTimeSum;
-  int _currentRepetition = 1; // Текущее повторение
-  int _errors = 0; // Количество ошибок
-  int _selectedRepetitions = 5; // Выбранное количество повторений
+  int _currentRepetition = 1;
+  int _errors = 0;
+  int _selectedRepetitions = 0;
+  final List<double> _reactionTimes = []; // Список для хранения времен реакций
+
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  final reactionProvider = Provider.of<ReactionProvider>(context);
+  setState(() {
+    _selectedRepetitions = reactionProvider.selectedRepetitions;
+  });
+}
 
   @override
   void initState() {
@@ -31,7 +39,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadSelectedRepetitions();
   }
 
-  // Загрузка сохраненного количества повторений
+  
+
   Future<void> _loadSelectedRepetitions() async {
     final reactionProvider = Provider.of<ReactionProvider>(context, listen: false);
     final repetitions = await reactionProvider.getSelectedRepetitions();
@@ -46,12 +55,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _isWaitingForGreen = false;
       _isShowingResult = false;
       _isTooEarly = false;
-      _isEnd = false; 
       _startTime = null;
-      _reactionTime = null;
       _reactionTimeSum = null;
       _currentRepetition = 1;
       _errors = 0;
+      _reactionTimes.clear();
       _timer?.cancel();
     });
   }
@@ -61,12 +69,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _isWaitingForStart = false;
       _isWaitingForGreen = true;
     });
-
     _nextMeasurement();
   }
 
-  void _nextMeasurement() async{
-
+  void _nextMeasurement() {
     _timer = Timer(Duration(seconds: Random().nextInt(2) + 2), () {
       if (mounted) {
         setState(() {
@@ -77,53 +83,40 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _onTap() {
-   if (_isEnd) {
-      _resetState();
-    }
+    void _onTap() {
     if (_isWaitingForStart) {
-      // Первое нажатие для начала теста
       _startTest();
     } else if (_isWaitingForGreen) {
-      // Ошибка: нажатие до появления зеленого цвета
       setState(() {
         _timer?.cancel();
         _isWaitingForGreen = false;
         _errors++;
-        _isTooEarly = true; // Переключаемся в состояние "слишком рано"
+        _isTooEarly = true;
       });
     } else if (_isTooEarly) {
-      // После ошибки возвращаемся к желтому цвету
-      _nextMeasurement();
       setState(() {
         _isTooEarly = false;
         _isWaitingForGreen = true;
       });
+      _nextMeasurement();
     } else if (!_isWaitingForGreen && !_isShowingResult) {
-      
-      // Корректное нажатие на зеленый блок
       final reactionTime = DateTime.now().difference(_startTime!).inMilliseconds.toDouble();
+      
       setState(() {
+        _reactionTimes.add(reactionTime);
         _reactionTimeSum = (_reactionTimeSum ?? 0) + reactionTime;
-        _reactionTime = reactionTime;
-        _isShowingResult = true;
       });
-      if (_currentRepetition == _selectedRepetitions){
-        _showResults();
-        _isShowingResult = false;
-        _isEnd = true;
+
+      if (_currentRepetition >= _selectedRepetitions) {
+        _showResults(); // Показываем результат, но НЕ увеличиваем _currentRepetition
+      } else {
+        setState(() {
+          _currentRepetition++;
+          _isWaitingForGreen = true;
+        });
+        _nextMeasurement();
       }
     }
-     else if (_isShowingResult) {
-      // Нажатие после отображения результата
-      _nextMeasurement();
-      setState(() {
-        _isShowingResult = false;
-        _isWaitingForGreen = true;
-        _currentRepetition++;// Возвращаемся к начальному состоянию
-      });
-    }
-    
   }
 
   void _showResults() {
@@ -134,103 +127,186 @@ class _HomeScreenState extends State<HomeScreen> {
       errors: _errors,
     );
 
-    setState(() {
-      _isShowingResult = true;
-    });
+    _showResultsDialog();
+     // Открываем окно с результатами
   }
 
-  @override
+  void _showResultsDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Запрещаем закрытие кликом вне окна
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Результат', textAlign: TextAlign.center),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Среднее время: ${(_reactionTimeSum! / _selectedRepetitions).toStringAsFixed(2)} мс',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              Text('Ошибки: $_errors', style: const TextStyle(fontSize: 16, color: Colors.red)),
+              const SizedBox(height: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: List.generate(
+                  _reactionTimes.length,
+                  (index) => Text('Повторение ${index + 1} - ${_reactionTimes[index].toStringAsFixed(2)} мс'),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _resetState();
+              },
+              child: const Text('Продолжить'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+    @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Тренинг Реакции'),
+        automaticallyImplyLeading: false,
+        toolbarHeight: 70.0,
         actions: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              '$_currentRepetition/$_selectedRepetitions',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Повторение: ...
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2.0),
+                        child: Text(
+                          'Повторение: $_currentRepetition/$_selectedRepetitions',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      // Ошибки: ...
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2.0),
+                        child: Text(
+                          'Ошибки: $_errors',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Кнопка рестарта
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _resetState,
+                ),
+              ],
             ),
-          ),
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _resetState,
           ),
         ],
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: _onTap,
-              child: Container(
-                width: 300,
-                height: 350,
-                color: _getColor(),
-                child: Center(
-                  child: _getText(),
-                ),
+  child: SingleChildScrollView(
+    padding: EdgeInsets.only(bottom: 100),
+    child: Column(
+      mainAxisSize: MainAxisSize.max,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 20),
+          child: Text(
+            'Дождитесь зелёного цвета и нажмите!',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        const SizedBox(height: 10),
+        GestureDetector(
+          onTap: _onTap,
+          child: Container(
+            width: 300,
+            height: 350,
+            decoration: BoxDecoration(
+              color: _isWaitingForStart 
+                ? Theme.of(context).scaffoldBackgroundColor 
+                : _getColor(),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(
+                color: Theme.of(context).textTheme.bodyLarge!.color!,
+                width: 2,
               ),
             ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/history');
-              },
-              child: const Text('История результатов'),
+            child: Center(
+              child: _getText(),
             ),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 30),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pushNamed(context, '/history');
+          },
+          style: ElevatedButton.styleFrom(
+            foregroundColor: Theme.of(context).textTheme.bodyLarge!.color,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            side: BorderSide(
+              color: Theme.of(context).textTheme.bodyLarge!.color!,
+              width: 2,
+            ),
+          ),
+          child: const Text('История результатов', style: TextStyle(fontSize: 16)),
+        ),
+      ],
+    ),
+  ),
+),
     );
   }
 
+
+
+
   Color _getColor() {
-    if (_isWaitingForStart) {
-      return Colors.grey; // Серый цвет до начала теста
-    } else if (_isWaitingForGreen) {
-      return Colors.yellow; // Желтый цвет во время ожидания
-    } else if (_isTooEarly) {
-      return Colors.red; // Красный цвет при ошибке
-    } else if (_isShowingResult || _isEnd) {
-      return Colors.blue; // Синий цвет при отображении результата
-    } else {
-      return Colors.green; // Зеленый цвет для нажатия
-    }
+    if (_isTooEarly) return Colors.transparent;
+    if (_isWaitingForGreen) return Colors.transparent;
+    return Colors.green;
   }
 
-  Widget _getText() {
+   Widget _getText() {
     if (_isWaitingForStart) {
-      return const Text('Нажмите, чтобы начать');
-    } else if (_isWaitingForGreen) {
-      return const Text('Ждите...');
+      return const Text('Начать');
+    } else if (_isWaitingForGreen){
+      return const Text('Ждите');      
     } else if (_isTooEarly) {
-      return const Text(
-        'Слишком рано!\nНажмите, чтобы продолжить',
-        textAlign: TextAlign.center,
-      );
-      } else if (_isShowingResult) {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('${(_reactionTime!).toStringAsFixed(0)} мс'),
-          Text('Среднее время реакции: ${(_reactionTimeSum! / (_currentRepetition)).toStringAsFixed(0)} мс'),
-          const Text('Нажмите, чтобы продолжить'),
-        ],
-      );
-    } else if (_isEnd) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('${(_reactionTime!).toStringAsFixed(0)} мс'),
-          Text('Среднее время реакции: ${(_reactionTimeSum! / (_currentRepetition)).toStringAsFixed(0)} мс'),
-          Text('Ошибок: $_errors'),
-          const Text('Нажмите, чтобы начать заново'),
+          const Text(
+            'Ошибка!',
+            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 24),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8), // Отступ между строками
+          const Text(
+            'Нажмите, чтобы продолжить',
+            style: TextStyle(fontSize: 16),
+            textAlign: TextAlign.center,
+          ),
         ],
       );
     } else {
-      return const Text('Жмите!');
+      return const Text('');
     }
   }
 }

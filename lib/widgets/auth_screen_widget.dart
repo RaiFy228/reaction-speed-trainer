@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -25,14 +26,18 @@ class AuthScreen extends StatelessWidget {
       Navigator.pushReplacementNamed(context, '/');
     }
   } on FirebaseAuthException catch (e) {
-    print('FirebaseAuthException: ${e.code}, ${e.message}');
+    if (kDebugMode) {
+      print('FirebaseAuthException: ${e.code}, ${e.message}');
+    }
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка регистрации: ${e.message}')),
       );
     }
   } catch (e) {
-    print('General Exception: $e');
+    if (kDebugMode) {
+      print('General Exception: $e');
+    }
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Произошла неизвестная ошибка')),
