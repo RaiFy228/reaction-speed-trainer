@@ -5,37 +5,27 @@ import 'package:shared_preferences/shared_preferences.dart';
 enum SortOrder { ascending, descending }
 
 class ReactionProvider with ChangeNotifier {
-  // Отдельные списки для хранения данных разных типов
+  final Map<int, List<Map<String, dynamic>>> _results = {};
+  SortOrder _sortOrder = SortOrder.descending;
+  final IReactionRepository _repository;
   int _selectedRepetitions = 0;
 
-
-  List<Map<String, dynamic>> _measurementResults = [];
-  List<Map<String, dynamic>> _levelResults = [];
-
-  SortOrder _sortOrder = SortOrder.descending;
-
-  final IReactionRepository _repository;
-
-  ReactionProvider(this._repository){
-    setSelectedRepetitions();
+  ReactionProvider(this._repository) {
+    loadSelectedRepetitions();
   }
 
   int get selectedRepetitions => _selectedRepetitions;
-
   SortOrder get sortOrder => _sortOrder;
 
-  // Геттеры для получения отсортированных данных
-  List<Map<String, dynamic>> get measurementResults => _getSortedResults(_measurementResults);
-  List<Map<String, dynamic>> get levelResults => _getSortedResults(_levelResults);
+  List<Map<String, dynamic>> getResults(int exerciseTypeId) {
+    return _getSortedResults(_results[exerciseTypeId] ?? []);
+  }
 
-  // Общая логика сортировки
   List<Map<String, dynamic>> _getSortedResults(List<Map<String, dynamic>> results) {
     final sortedResults = List<Map<String, dynamic>>.from(results);
-    if (_sortOrder == SortOrder.descending) {
-      sortedResults.sort((a, b) => DateTime.parse(b['date']).compareTo(DateTime.parse(a['date'])));
-    } else {
-      sortedResults.sort((a, b) => DateTime.parse(a['date']).compareTo(DateTime.parse(b['date'])));
-    }
+    sortedResults.sort((a, b) => _sortOrder == SortOrder.descending
+        ? DateTime.parse(b['CompletedAt']).compareTo(DateTime.parse(a['CompletedAt']))
+        : DateTime.parse(a['CompletedAt']).compareTo(DateTime.parse(b['CompletedAt'])));
     return sortedResults;
   }
 
@@ -44,22 +34,10 @@ class ReactionProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadResults({
-    required String type,
-    String? levelId,
-  }) async {
+  Future<void> loadResults(int exerciseTypeId) async {
     try {
-      final results = await _repository.loadResults(
-        type: type,
-        levelId: levelId,
-      );
-
-      if (type == 'measurements') {
-        _measurementResults = results;
-      } else if (type == 'levels') {
-        _levelResults = results;
-      }
-
+      final results = await _repository.loadResults(exerciseTypeId: exerciseTypeId);
+      _results[exerciseTypeId] = results;
       notifyListeners();
     } catch (e) {
       if (kDebugMode) {
@@ -69,23 +47,23 @@ class ReactionProvider with ChangeNotifier {
   }
 
   Future<void> addResult({
-    required String type,
-    required double time,
-    int? repetitions,
-    int? errors,
-    String? levelId,
-    String? date,
+  required int exerciseTypeId,
+  required double time,
+  int? repetitions,
+  int? errors,
+  String? date,
+  required List<Map<String, dynamic>> details,
   }) async {
     try {
       await _repository.addResult(
-        type: type,
+        exerciseTypeId: exerciseTypeId,
         time: time,
         repetitions: repetitions,
         errors: errors,
-        levelId: levelId,
         date: date,
+        details: details,
       );
-      await loadResults(type: type, levelId: levelId);
+      await loadResults(exerciseTypeId);
     } catch (e) {
       if (kDebugMode) {
         print('Ошибка при добавлении результата: $e');
@@ -95,23 +73,13 @@ class ReactionProvider with ChangeNotifier {
 
   Future<void> deleteResultById({
     required String id,
-    required String type,
-    String? levelId,
+    required int exerciseTypeId,
   }) async {
     try {
       await _repository.deleteResultById(
         id: id,
-        type: type,
-        levelId: levelId,
+        exerciseTypeId: exerciseTypeId,
       );
-
-      if (type == 'measurements') {
-        _measurementResults.removeWhere((result) => result['id'] == id);
-      } else if (type == 'levels') {
-        _levelResults.removeWhere((result) => result['id'] == id);
-      }
-
-      notifyListeners();
     } catch (e) {
       if (kDebugMode) {
         print('Ошибка удаления результата по ID: $e');
@@ -119,11 +87,10 @@ class ReactionProvider with ChangeNotifier {
     }
   }
 
-  Future<void> clearResults() async {
+  Future<void> clearResults(int exerciseTypeId) async {
     try {
-      await _repository.clearResults();
-      _measurementResults.clear();
-      _levelResults.clear();
+      await _repository.clearResults(exerciseTypeId: exerciseTypeId);
+      _results.remove(exerciseTypeId);
       notifyListeners();
     } catch (e) {
       if (kDebugMode) {
@@ -132,19 +99,52 @@ class ReactionProvider with ChangeNotifier {
     }
   }
 
-  // Метод для получения выбранного количества повторений
+  void removeLocalResult({required int exerciseTypeId, required String resultId}) {
+    _results[exerciseTypeId]?.removeWhere((result) => result['Id'].toString() == resultId);
+    notifyListeners();
+  }
+
+  void restoreLocalResult({
+    required int exerciseTypeId,
+    required Map<String, dynamic> result,
+    required int index,
+  }) {
+    _results[exerciseTypeId]?.insert(index, result);
+    notifyListeners();
+  }
+
   Future<int> getSelectedRepetitions() async {
     final prefs = await SharedPreferences.getInstance();
     _selectedRepetitions = prefs.getInt('selectedRepetitions') ?? 5;
     notifyListeners();
-    return prefs.getInt('selectedRepetitions') ?? 5;
-
+    return _selectedRepetitions;
   }
 
-  void setSelectedRepetitions() async {
-     final prefs = await SharedPreferences.getInstance();
+  void loadSelectedRepetitions() async {
+    final prefs = await SharedPreferences.getInstance();
     _selectedRepetitions = prefs.getInt('selectedRepetitions') ?? 5;
     notifyListeners();
   }
-  
+
+  List<Map<String, dynamic>> get allResults => 
+    _results.values.expand((e) => e).toList();
+
+  Future<void> loadAllResults() async {
+    try {
+      final results = await _repository.loadAllResults();
+      
+      // Группируем результаты по ExerciseTypeId
+      _results.clear();
+      for (var result in results) {
+        final typeId = result['ExerciseTypeId'];
+        _results.putIfAbsent(typeId, () => []).add(result);
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Ошибка загрузки всех данных: $e');
+      }
+    }
+  }
 }

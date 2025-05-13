@@ -1,6 +1,8 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:reaction_speed_trainer/screens/tabbed_home_screen.dart';
+import '../services/auth_service.dart';
+import '../screens/tabbed_home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,128 +12,95 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
-  bool _isPasswordVisible = false; // Новое состояние для видимости пароля
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+  bool _isPasswordVisible = false;
 
-  Future<void> _login(BuildContext context) async {
-    if (_formKey.currentState!.validate()) {
-      try {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      await _authService.login(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
+      );
+      
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const TabbedHomeScreen()),
         );
-
-        if (context.mounted) {
-          Navigator.pushReplacementNamed(context, '/');
-        }
-       } on FirebaseAuthException catch (e) {
-        String errorMessage;
-
-        switch (e.code) {
-          case 'invalid-credential':
-            errorMessage = 'Аккаунта с таким email не сузествует.';
-            break;
-          default:
-            errorMessage = 'Ошибка авторизации: ${e.message}';
-        }
-        
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(errorMessage)),
-          );
-        }
       }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final firebaseUser = FirebaseAuth.instance.currentUser;
-
-    if (firebaseUser != null) {
-      return const TabbedHomeScreen();
-    } else {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Вход'),
-          automaticallyImplyLeading: false,
-        ),
-        body: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Пожалуйста, введите email';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Введите корректный email';
-                    }
-                    return null;
-                  },
-                ),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: 'Пароль',
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _isPasswordVisible
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _isPasswordVisible = !_isPasswordVisible;
-                        });
-                      },
-                    ),
-                  ),
-                  obscureText: !_isPasswordVisible, // Управление видимостью
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Пожалуйста, введите пароль';
-                    }
-                    if (value.length < 6) {
-                      return 'Неправильный пароль';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () => _login(context),
-                  style: ElevatedButton.styleFrom(
-                  foregroundColor: Theme.of(context).textTheme.bodyLarge!.color,
-                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8), // Скругление углов
-                    ),
-                  side: BorderSide(
-                    color: Theme.of(context).textTheme.bodyLarge!.color!,
-                    width: 2,
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Вход'),
+        automaticallyImplyLeading: false,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Введите email';
+                  if (!value!.contains('@')) return 'Неверный формат email';
+                  return null;
+                },
+              ),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: !_isPasswordVisible,
+                decoration: InputDecoration(
+                  labelText: 'Пароль',
+                  suffixIcon: IconButton(
+                    icon: Icon(_isPasswordVisible 
+                      ? Icons.visibility_off 
+                      : Icons.visibility),
+                    onPressed: () => setState(() => 
+                      _isPasswordVisible = !_isPasswordVisible),
                   ),
                 ),
-                  child: const Text('Войти'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/register');
-                  },
-                  child: const Text('Еще нет аккаунта? Зарегистрируйтесь'),
-                ),
-              ],
-            ),
+                validator: (value) {
+                  if (value?.isEmpty ?? true) return 'Введите пароль';
+                  if (value!.length < 6) return 'Минимум 6 символов';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _handleLogin,
+                child: _isLoading 
+                  ? const CircularProgressIndicator()
+                  : const Text('Войти'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, '/register'),
+                child: const Text('Еще нет аккаунта? Зарегистрируйтесь'),
+              ),
+            ],
           ),
         ),
-      );
-    }
+      ),
+    );
   }
 }

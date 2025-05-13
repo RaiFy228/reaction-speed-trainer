@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:reaction_speed_trainer/models/level.dart';
+import 'package:reaction_speed_trainer/screens/home_history_screen.dart';
 import '../providers/levels_provider.dart';
 import '../screens/training_session_screen.dart';
-import '../screens/level_history_screen.dart';
 
 class LevelsListScreen extends StatelessWidget {
   const LevelsListScreen({super.key});
@@ -13,10 +13,10 @@ class LevelsListScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => LevelHistoryScreen(
-          levelId: level.id,
-          levelName: level.name, // Передаем название уровня
-        ),
+        builder: (context) => HistoryScreen(
+            exerciseTypeId: level.id,
+            exerciseName: level.name,
+          ),
       ),
     );
   }

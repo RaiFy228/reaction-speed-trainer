@@ -174,13 +174,21 @@ class _Level5WidgetState extends State<Level5Widget> {
   }
 
   void _showResults() {
+    final details = _reactionTimes.asMap().entries.map((entry) {
+    return {
+      'reactionTimeMs': entry.value.toInt(),
+      'attemptNumber': entry.key + 1,
+    };
+    }).toList();
+
     Provider.of<ReactionProvider>(context, listen: false).addResult(
-      type: 'levels',
-      levelId: '5',
+      exerciseTypeId: 6,
       time: _reactionTimeSum! / _selectedRepetitions,
       repetitions: _selectedRepetitions,
       errors: _errors,
+      details: details,
     );
+
 
     showDialog(
       context: context,

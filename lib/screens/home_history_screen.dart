@@ -1,37 +1,72 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/reaction_provider.dart';
+import 'chart_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  final int exerciseTypeId;
+  final String exerciseName;
 
-   @override
+  const HistoryScreen({
+    super.key,
+    required this.exerciseTypeId,
+    required this.exerciseName,
+  });
+
+  @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-
-@override
+  @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ReactionProvider>(context, listen: false).loadResults( type: 'measurements');
+      Provider.of<ReactionProvider>(context, listen: false)
+          .loadResults(widget.exerciseTypeId);
     });
+  }
+
+  String _formatDate(String isoDate) {
+    final date = DateTime.parse(isoDate);
+    return '${date.day.toString().padLeft(2, '0')}.'
+        '${date.month.toString().padLeft(2, '0')}.'
+        '${date.year} '
+        '${date.hour.toString().padLeft(2, '0')}:'
+        '${date.minute.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
     final reactionProvider = Provider.of<ReactionProvider>(context);
-    final results = reactionProvider.measurementResults;
+    final results = reactionProvider.getResults(widget.exerciseTypeId);
 
     return Scaffold(
-     appBar: AppBar(
+      appBar: AppBar(
         title: Text(
-          'История результатов',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          widget.exerciseName,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.show_chart),
+            onPressed: results.isEmpty
+                ? null
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChartScreen(
+                          initialResults: results, // Передаем исходные данные
+                          exerciseName: widget.exerciseName,
+                        ),
+                      ),
+                    );
+                  },
+          ),
+        ],
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(40), // Высота нижней части
+          preferredSize: const Size.fromHeight(40),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
@@ -39,10 +74,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
               children: [
                 DropdownButton<SortOrder>(
                   value: reactionProvider.sortOrder,
-                  onChanged: (value) {
-                    reactionProvider.setSortOrder(value!);
-                  },
-                  items: [
+                  onChanged: (value) => reactionProvider.setSortOrder(value!),
+                  items: const [
                     DropdownMenuItem(
                       value: SortOrder.descending,
                       child: Text('Новые сверху'),
@@ -55,9 +88,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_forever),
-                  onPressed: () {
-                    _showClearHistoryDialog(context, reactionProvider);
-                  },
+                  onPressed: () => _showClearHistoryDialog(context, reactionProvider),
                 ),
               ],
             ),
@@ -71,7 +102,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               itemBuilder: (context, index) {
                 final result = results[index];
                 return Dismissible(
-                  key: Key(result['id']), // Уникальный ключ для каждого элемента
+                  key: Key(result['Id'].toString()),
                   direction: DismissDirection.endToStart,
                   background: Container(
                     color: Colors.red,
@@ -79,35 +110,64 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     padding: const EdgeInsets.only(right: 20),
                     child: const Icon(Icons.delete, color: Colors.white),
                   ),
-                  onDismissed: (_) {
-                    // Удаляем элемент по его уникальному ID
-                    reactionProvider.deleteResultById(
-                      id: result['id'], // Передаем уникальный ID
-                      type: 'measurements', // Указываем тип результата
-                    
+                   onDismissed: (_) async {
+                    final deletedItem = result;
+                    final deletedItemIndex = results.indexOf(result);
+
+                    reactionProvider.removeLocalResult(
+                      exerciseTypeId: widget.exerciseTypeId,
+                      resultId: result['Id'].toString(),
                     );
 
-                    // Показываем SnackBar с возможностью отмены
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Запись удалена'),
-                        action: SnackBarAction(
-                          label: 'Отмена',
-                          onPressed: () async {
-                            // Восстанавливаем удаленный элемент
-                            await reactionProvider.addResult(
-                              type: 'measurements', // Указываем тип результата
-                              time: result['time'].toDouble(),
-                              date: result['date'], // Передаем оригинальную дату
-                            );
-                          },
+                    final scaffold = ScaffoldMessenger.of(context);
+                    late SnackBarClosedReason reason;
+
+                    try {
+                      reason = await scaffold.showSnackBar(
+                        SnackBar(
+                          content: const Text('Запись удалена'),
+                          action: SnackBarAction(
+                            label: 'Отмена',
+                            onPressed: () {
+                              reason = SnackBarClosedReason.action;
+                            },
+                          ),
+                          duration: const Duration(seconds: 5),
                         ),
-                      ),
-                    );
+                      ).closed;
+                    } catch (_) {
+                      reason = SnackBarClosedReason.remove;
+                    }
+
+                    if (reason != SnackBarClosedReason.action) {
+                      try {
+                        await reactionProvider.deleteResultById(
+                          id: deletedItem['Id'].toString(),
+                          exerciseTypeId: widget.exerciseTypeId,
+                        );
+                      } catch (e) {
+                        // Восстанавливаем при ошибке
+                        reactionProvider.restoreLocalResult(
+                          exerciseTypeId: widget.exerciseTypeId,
+                          result: deletedItem,
+                          index: deletedItemIndex,
+                        );
+                      }
+                    }
+                    else {
+                      reactionProvider.restoreLocalResult(
+                          exerciseTypeId: widget.exerciseTypeId,
+                          result: deletedItem,
+                          index: deletedItemIndex,
+                      );
+                    }
                   },
                   child: ListTile(
-                    title: Text('${result['time'].toStringAsFixed(0)} мс, Ошибки: ${result['errors']}'),
-                    subtitle: Text(result['date']),
+                    title: Text(
+                      '${result['AverageReactionTimeMs']} мс, '
+                      'Ошибки: ${result['ErrorCount']}',
+                    ),
+                    subtitle: Text(_formatDate(result['CompletedAt'])),
                   ),
                 );
               },
@@ -128,7 +188,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           TextButton(
             onPressed: () {
-              provider.clearResults();
+              provider.clearResults(widget.exerciseTypeId);
               Navigator.pop(context);
             },
             child: const Text('Удалить'),

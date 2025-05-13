@@ -139,15 +139,21 @@ void _nextRound() {
 
 
   void _showResults() {
-    // Вычисляем среднее время реакции только по целевым раундам
-    final averageTime = _reactionTimes.isNotEmpty ? _reactionTimeSum / _reactionTimes.length : 0;
+    final details = _reactionTimes.asMap().entries.map((entry) {
+    return {
+      'reactionTimeMs': entry.value.toInt(),
+      'attemptNumber': entry.key + 1,
+    };
+    }).toList();
+
     Provider.of<ReactionProvider>(context, listen: false).addResult(
-      type: 'levels',
-      levelId: '3',
-      time: averageTime.toDouble(),
+      exerciseTypeId: 4,
+      time: _reactionTimeSum / _selectedRepetitions,
       repetitions: _selectedRepetitions,
       errors: _errors,
+      details: details,
     );
+
 
     showDialog(
       context: context,
@@ -158,7 +164,7 @@ void _nextRound() {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Среднее время: ${averageTime.toStringAsFixed(2)} мс',
+              Text('Среднее время: ${(_reactionTimeSum / _selectedRepetitions).toStringAsFixed(2)} мс',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               Text('Ошибки: $_errors', style: const TextStyle(fontSize: 16, color: Colors.red)),
