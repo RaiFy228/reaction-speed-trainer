@@ -130,13 +130,19 @@ class _Level4WidgetState extends State<Level4Widget> {
   }
 
   void _showResults() {
-    final averageTime = _reactionTimes.isNotEmpty ? _reactionTimeSum / _reactionTimes.length : 0;
+    final details = _reactionTimes.asMap().entries.map((entry) {
+    return {
+      'reactionTimeMs': entry.value.toInt(),
+      'attemptNumber': entry.key + 1,
+    };
+    }).toList();
+
     Provider.of<ReactionProvider>(context, listen: false).addResult(
-      type: 'levels',
-      levelId: '4',
-      time: averageTime.toDouble(),
+      exerciseTypeId: 5,
+      time: _reactionTimeSum / _selectedRepetitions,
       repetitions: _selectedRepetitions,
       errors: _errors,
+      details: details,
     );
 
     showDialog(
@@ -148,7 +154,7 @@ class _Level4WidgetState extends State<Level4Widget> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Среднее время: ${averageTime.toStringAsFixed(2)} мс',
+              Text('Среднее время: ${(_reactionTimeSum / _selectedRepetitions).toStringAsFixed(2)} мс',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               Text('Ошибки: $_errors', style: const TextStyle(fontSize: 16, color: Colors.red)),

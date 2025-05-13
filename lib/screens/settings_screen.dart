@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:reaction_speed_trainer/providers/reaction_provider.dart';
 import 'package:reaction_speed_trainer/providers/theme_provider.dart';
+import 'package:reaction_speed_trainer/services/export_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:reaction_speed_trainer/services/auth_service.dart';
+import 'login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -13,7 +15,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  int _selectedRepetitions = 5; // Значение по умолчанию
+  int _selectedRepetitions = 5;
 
   @override
   void initState() {
@@ -21,118 +23,248 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadSelectedRepetitions();
   }
 
-  // Загрузка сохраненного значения из SharedPreferences
   Future<void> _loadSelectedRepetitions() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedRepetitions = prefs.getInt('selectedRepetitions');
-    if (savedRepetitions != null) {
-      setState(() {
-        _selectedRepetitions = savedRepetitions;
-      });
-    }
+    setState(() {
+      _selectedRepetitions = prefs.getInt('selectedRepetitions') ?? 5;
+    });
   }
 
-  // Сохранение выбранного значения в SharedPreferences
   void _saveSelectedRepetitions(int value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('selectedRepetitions', value);
-
+    
     if (mounted) {
-      final reactionProvider = Provider.of<ReactionProvider>(context, listen: false);
-      reactionProvider.setSelectedRepetitions();
+      Provider.of<ReactionProvider>(context, listen: false).loadSelectedRepetitions();
     }
   }
 
-  // Уменьшение количества повторений
   void _decreaseRepetitions() {
     if (_selectedRepetitions > 1) {
-      setState(() {
-        _selectedRepetitions--;
-      });
+      setState(() => _selectedRepetitions--);
       _saveSelectedRepetitions(_selectedRepetitions);
     }
   }
 
-  // Увеличение количества повторений
   void _increaseRepetitions() {
     if (_selectedRepetitions < 10) {
-      setState(() {
-        _selectedRepetitions++;
-      });
+      setState(() => _selectedRepetitions++);
       _saveSelectedRepetitions(_selectedRepetitions);
     }
   }
 
   Future<void> _signOut(BuildContext context) async {
     try {
-      await FirebaseAuth.instance.signOut();
+      final authService = AuthService();
+      await authService.logout();
 
-      // Проверяем, что виджет все еще существует перед навигацией
       if (context.mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
       }
     } catch (e) {
-      // Проверяем, что виджет все еще существует перед показом SnackBar
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка при выходе: $e')),
+          SnackBar(content: Text('Ошибка при выходе: ${e.toString()}')),
         );
       }
     }
   }
 
+  Future<void> _exportData(BuildContext context) async {
+  final provider = Provider.of<ReactionProvider>(context, listen: false);
+  final exportService = ExportService();
+
+  final format = await showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Формат экспорта'),
+      content: const Text('Выберите желаемый формат файла:'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, 'CSV'),
+          child: const Text('CSV'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, 'JSON'),
+          child: const Text('JSON'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Отмена'),
+        ),
+      ],
+    ),
+  );
+
+  if (format == null || !context.mounted) return;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => const Center(child: CircularProgressIndicator()),
+  );
+
+  try {
+    await provider.loadAllResults();
+
+    if (provider.allResults.isEmpty) {
+    if (!context.mounted) return;
+
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Нет данных для сохранения'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    return;
+  }
+
+    final result = format == 'CSV'
+        ? await exportService.exportToCsv(provider.allResults)
+        : await exportService.exportToJson(provider.allResults);
+
+    if (context.mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result != null
+              ? 'Данные успешно экспортированы в $format'
+              : 'Ошибка при создании файла'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка экспорта: ${e.toString()}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+}
+
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Настройки'),
+        centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Количество повторений:',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Кнопка уменьшения
-                IconButton(
-                  icon: const Icon(Icons.arrow_left),
-                  onPressed: _decreaseRepetitions,
-                ),
-                // Отображение текущего значения
-                Text(
-                  '$_selectedRepetitions',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                // Кнопка увеличения
-                IconButton(
-                  icon: const Icon(Icons.arrow_right),
-                  onPressed: _increaseRepetitions,
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            SwitchListTile(
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildSectionHeader('Основные настройки'),
+          _buildRepetitionsControl(theme),
+          const Divider(thickness: 1),
+          
+          _buildSectionHeader('Внешний вид'),
+          SwitchListTile(
             title: const Text('Темная тема'),
             value: themeProvider.isDarkMode,
             onChanged: (value) => themeProvider.toggleTheme(),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
-            const SizedBox(height: 20),
-            ListTile(
-              title: const Text('Выйти из аккаунта'),
-              trailing: const Icon(Icons.logout),
-              onTap: () => _signOut(context),
-            ),
-          ],
+          const Divider(thickness: 1),
+          
+          _buildSectionHeader('Данные'),
+          _buildExportButton(theme),
+          const Divider(thickness: 1),
+          
+          _buildSectionHeader('Аккаунт'),
+          _buildLogoutButton(theme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey,
         ),
       ),
+    );
+  }
+
+  Widget _buildRepetitionsControl(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Количество повторений',
+              style: theme.textTheme.bodyLarge,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.remove),
+            onPressed: _decreaseRepetitions,
+            style: IconButton.styleFrom(
+              backgroundColor: theme.colorScheme.surfaceVariant,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              '$_selectedRepetitions',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _increaseRepetitions,
+            style: IconButton.styleFrom(
+              backgroundColor: theme.colorScheme.surfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExportButton(ThemeData theme) {
+    return ListTile(
+      leading: const Icon(Icons.download),
+      title: const Text('Экспорт данных'),
+      subtitle: const Text('CSV или JSON формат'),
+      onTap: () => _exportData(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      tileColor: theme.colorScheme.surfaceVariant,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    );
+  }
+
+  Widget _buildLogoutButton(ThemeData theme) {
+    return ListTile(
+      leading: const Icon(Icons.logout, color: Colors.red),
+      title: const Text('Выйти из аккаунта', style: TextStyle(color: Colors.red)),
+      onTap: () => _signOut(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      tileColor: theme.colorScheme.surfaceVariant,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     );
   }
 }

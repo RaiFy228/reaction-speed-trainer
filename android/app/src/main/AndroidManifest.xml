@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.reaction_speed_trainer">
     <application
+        android:usesCleartextTraffic="true"
         android:label="Тренинг реакции"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

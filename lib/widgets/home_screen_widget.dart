@@ -120,15 +120,22 @@ void didChangeDependencies() {
   }
 
   void _showResults() {
+    final details = _reactionTimes.asMap().entries.map((entry) {
+    return {
+      'reactionTimeMs': entry.value.toInt(),
+      'attemptNumber': entry.key + 1,
+    };
+    }).toList();
+
     Provider.of<ReactionProvider>(context, listen: false).addResult(
-      type: 'measurements',
+      exerciseTypeId: 1,
       time: _reactionTimeSum! / _selectedRepetitions,
       repetitions: _selectedRepetitions,
       errors: _errors,
+      details: details,
     );
 
-    _showResultsDialog();
-     // Открываем окно с результатами
+    _showResultsDialog(); 
   }
 
   void _showResultsDialog() {

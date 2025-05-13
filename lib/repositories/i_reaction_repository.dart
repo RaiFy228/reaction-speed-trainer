@@ -1,23 +1,24 @@
 abstract class IReactionRepository {
   Future<void> addResult({
-    required String type,
+    required int exerciseTypeId,
     required double time,
     int? repetitions,
     int? errors,
-    String? levelId,
     String? date,
+    required List<Map<String, dynamic>> details,
   });
 
   Future<List<Map<String, dynamic>>> loadResults({
-    required String type,
-    String? levelId,
+    required int exerciseTypeId,
   });
 
   Future<void> deleteResultById({
     required String id,
-    required String type,
-    String? levelId,
+    required int exerciseTypeId,
   });
 
-  Future<void> clearResults();
+  Future<void> clearResults({
+    required int exerciseTypeId,
+  });
+   Future<List<Map<String, dynamic>>> loadAllResults();
 }
